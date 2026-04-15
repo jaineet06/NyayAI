@@ -1,0 +1,91 @@
+import { useState } from "react";
+import { ArrowUp, Plus } from "lucide-react";
+import { useLocation } from "react-router-dom";
+
+const Chat = ({}) => {
+  const location = useLocation();
+  const initialPrompt = location.state?.initialPrompt || "";
+  const [prompt, setPrompt] = useState(initialPrompt);
+
+  const suggestions = [
+    "How do I file a consumer complaint for a faulty product?",
+    "What are my rights against unfair workplace termination?",
+    "Draft an RTI application to check my passport status.",
+    "How do I register an FIR for online financial fraud?",
+  ];
+
+  return (
+    <div className="flex flex-col h-full max-w-3xl mx-auto w-full relative">
+      <div className="flex-1 overflow-y-auto flex flex-col pb-28 pt-8">
+        <div className="flex flex-col items-center text-center px-4 my-auto">
+          <span className="text-emerald-600 font-medium tracking-wide text-lg mb-2">
+            नमस्ते
+          </span>
+
+          <h2 className="text-2xl md:text-3xl font-medium text-gray-900 tracking-tight mb-2">
+            How can I help you today?
+          </h2>
+          <p className="text-sm text-gray-500 mb-10 max-w-md">
+            Describe your situation in plain language—Hindi, English, or
+            Hinglish. I will guide you through your legal rights and next steps.
+          </p>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 w-full max-w-2xl text-left">
+            {suggestions.map((suggestion, index) => (
+              <button
+                key={index}
+                onClick={() => setPrompt(suggestion)}
+                className="p-4 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 hover:border-gray-300 transition-all text-sm text-gray-600 text-left"
+              >
+                {suggestion}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-auto bg-white pt-4 pb-2 z-10">
+        <div className="w-full bg-white border border-gray-200 shadow-[0_8px_30px_rgb(0,0,0,0.06)] rounded-2xl overflow-hidden transition-all focus-within:ring-2 focus-within:ring-gray-900/10 focus-within:border-gray-300">
+          <textarea
+            value={prompt}
+            onChange={(e) => setPrompt(e.target.value)}
+            className="w-full p-4 resize-none outline-none bg-transparent text-gray-900 placeholder:text-gray-400 text-base max-h-40 overflow-y-auto"
+            placeholder="Describe your legal issue..."
+            rows="1"
+            onInput={(e) => {
+              e.target.style.height = "auto";
+              e.target.style.height = e.target.scrollHeight + "px";
+            }}
+          />
+
+          <div className="flex items-center justify-between pb-3 px-4 pt-1">
+            <button
+              className="flex items-center justify-center bg-gray-50 hover:bg-gray-100 border border-gray-100 transition-colors p-1.5 rounded-full size-8 text-gray-500 hover:text-gray-900"
+              aria-label="Add attachment"
+            >
+              <Plus size={18} strokeWidth={2.5} />
+            </button>
+
+            <button
+              className={`flex items-center justify-center p-1.5 rounded-full size-8 transition-colors ${
+                prompt.trim().length > 0
+                  ? "bg-gray-900 text-white hover:bg-black shadow-md"
+                  : "bg-gray-100 text-gray-400 cursor-not-allowed"
+              }`}
+              aria-label="Send prompt"
+            >
+              <ArrowUp size={18} strokeWidth={2.5} />
+            </button>
+          </div>
+        </div>
+
+        <p className="text-[11px] text-gray-400 text-center mt-4">
+          NyayaAI can make mistakes. Always verify important legal information
+          with an advocate.
+        </p>
+      </div>
+    </div>
+  );
+};
+
+export default Chat;

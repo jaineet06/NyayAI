@@ -1,11 +1,11 @@
 import { useState } from "react";
 import { LockKeyhole, Mic, SparklesIcon } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 const Hero = () => {
-  // State to hold the text in the prompt box
   const [promptText, setPromptText] = useState("");
+  const navigate = useNavigate();
 
-  // Added predefined prompts to each tag
   const legalAreaTags = [
     {
       name: "Consumer complaint",
@@ -39,12 +39,23 @@ const Hero = () => {
     },
   ];
 
-  // We duplicate the array so the marquee loops seamlessly without snapping
   const marqueeTags = [...legalAreaTags, ...legalAreaTags];
+
+  const handleSend = (textToSend = promptText) => {
+    if (textToSend.trim().length > 0) {
+      navigate("/dashboard", { state: { initialPrompt: textToSend } });
+    }
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSend();
+    }
+  };
 
   return (
     <>
-      {/* Inline styles for the seamless marquee animation and edge fading */}
       <style>{`
         @keyframes marquee {
           0% { transform: translateX(0%); }
@@ -87,7 +98,6 @@ const Hero = () => {
             Instant. No lawyer needed.
           </p>
 
-          {/* Prompt Box */}
           <div className="w-full max-w-3xl mx-auto bg-[#0a0a0a] border border-gray-800 rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] p-3 md:p-4 mb-4 transition-all duration-300 focus-within:ring-1 focus-within:ring-emerald-500/50 relative z-20">
             <div className="flex flex-col text-left">
               <textarea
@@ -113,8 +123,9 @@ const Hero = () => {
                   </button>
 
                   <button
+                    onClick={() => handleSend()}
                     type="button"
-                    className="p-2 bg-emerald-600 text-white hover:bg-emerald-500 rounded-full transition-colors shadow-md flex items-center justify-center"
+                    className="p-2 bg-emerald-600 text-white hover:bg-emerald-500 rounded-full transition-colors shadow-md flex items-center justify-center cursor-pointer"
                     aria-label="Send prompt"
                   >
                     <SparklesIcon className="size-4" />
@@ -124,9 +135,7 @@ const Hero = () => {
             </div>
           </div>
 
-          {/* Marquee Tags Selection */}
           <div className="w-full max-w-3xl overflow-hidden mb-10 mask-edges relative z-10">
-            {/* The flex container that animates horizontally */}
             <div className="flex w-max animate-marquee gap-3 py-2">
               {marqueeTags.map((tag, index) => (
                 <button

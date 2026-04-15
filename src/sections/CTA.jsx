@@ -1,6 +1,8 @@
 import { SparklesIcon } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 const CTA = () => {
+  const navigate = useNavigate();
   return (
     <section className="flex flex-col items-center justify-center max-w-7xl mx-auto my-10 px-4">
       <h3 className="font-domine text-3xl md:text-4xl max-w-lg text-center bg-linear-to-r from-gray-900 to-gray-600 bg-clip-text text-transparent font-bold tracking-tight">
@@ -13,8 +15,8 @@ const CTA = () => {
       </p>
 
       <button
-        onClick={() => scrollTo({ left: 0, top: 0, behavior: "smooth" })}
-        className="mt-8 flex items-center bg-black hover:bg-black/90 shadow-lg transition px-6 text-base py-3 text-white rounded-full"
+        onClick={() => navigate("/dashboard")}
+        className="mt-8 flex items-center bg-black hover:bg-black/90 shadow-lg transition px-6 text-base py-3 text-white rounded-full cursor-pointer"
       >
         <SparklesIcon width={18} />
         <span className="ml-2">Get Instant Legal Clarity Now</span>

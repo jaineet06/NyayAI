@@ -1,4 +1,4 @@
-import { MenuIcon, MoveRight, XIcon } from "lucide-react";
+import { MoveRight, XIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
@@ -13,6 +13,7 @@ export default function Navbar() {
     { name: "Features", href: "#feature" },
     { name: "How it works", href: "#working" },
   ];
+
   useEffect(() => {
     const handleScroll = () => {
       setIsScrolled(window.scrollY > 120);
@@ -142,28 +143,57 @@ export default function Navbar() {
             ))}
           </motion.div>
 
-          <div className="flex items-center gap-3">
-            <motion.div layout>
+          <div className="flex items-center gap-2 md:gap-3">
+            <motion.div layout className="hidden md:flex items-center gap-5">
               <Link
                 to="/login"
-                className={`hidden md:flex items-center justify-center gap-3 text-zinc-50 text-[15px] font-medium rounded-full cursor-pointer transition-all duration-300 ${
+                className="text-[14px] font-semibold text-gray-500 hover:text-gray-900 transition-colors"
+              >
+                Log in
+              </Link>
+
+              <span className="w-px h-4 bg-gray-300"></span>
+
+              <Link
+                to="/dashboard"
+                className={`flex items-center justify-center gap-3 text-white text-[14px] font-medium rounded-full cursor-pointer transition-all duration-300 ${
                   isScrolled
-                    ? "bg-black hover:bg-gray-800 pl-5 pr-1.5 py-1.5 shadow-md"
+                    ? "bg-black hover:bg-gray-800 pl-4 pr-1.5 py-1.5 shadow-md"
                     : "bg-black hover:bg-gray-800 px-5 py-2"
                 }`}
               >
-                Login
-                <span className="size-7 rounded-full bg-white flex items-center justify-center text-gray-900 shadow-sm">
-                  <MoveRight size={14} strokeWidth={2.5} />
+                Open App
+                <span className="size-6 rounded-full bg-white flex items-center justify-center text-gray-900 shadow-sm">
+                  <MoveRight size={12} strokeWidth={2.5} />
                 </span>
               </Link>
             </motion.div>
 
+            <Link
+              to="/dashboard"
+              className="md:hidden flex items-center justify-center bg-black text-white text-[13px] font-medium rounded-full px-4 py-2 hover:bg-gray-800 transition-colors pointer-events-auto"
+            >
+              Open App
+            </Link>
+
             <button
               onClick={() => setIsOpen(true)}
-              className="md:hidden p-2 rounded-full hover:bg-gray-100 transition-colors pointer-events-auto"
+              className="md:hidden size-9 flex items-center justify-center rounded-full bg-gray-50 border border-gray-200 hover:bg-gray-100 transition-colors pointer-events-auto"
             >
-              <MenuIcon className="size-6 text-gray-800" />
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="text-gray-800"
+              >
+                <line x1="4" x2="20" y1="9" y2="9" />
+                <line x1="4" x2="15" y1="15" y2="15" />
+              </svg>
             </button>
           </div>
         </motion.div>
@@ -216,14 +246,22 @@ export default function Navbar() {
                 ))}
               </div>
 
-              <div className="mt-auto p-6 border-t border-gray-100">
+              <div className="mt-auto p-6 border-t border-gray-100 flex flex-col gap-2">
+                <Link
+                  to="/dashboard"
+                  onClick={() => setIsOpen(false)}
+                  className="flex items-center justify-center gap-3 w-full bg-black text-white text-[15px] font-medium px-5 py-3.5 rounded-full shadow-md"
+                >
+                  Open App
+                  <MoveRight size={16} />
+                </Link>
+
                 <Link
                   to="/login"
                   onClick={() => setIsOpen(false)}
-                  className="flex items-center justify-center gap-3 w-full bg-black text-white text-base font-medium px-5 py-3.5 rounded-full"
+                  className="flex items-center justify-center w-full text-gray-500 hover:text-gray-900 text-[15px] font-medium px-5 py-3 transition-colors"
                 >
-                  Login
-                  <MoveRight size={18} />
+                  Log in to account
                 </Link>
               </div>
             </motion.div>
