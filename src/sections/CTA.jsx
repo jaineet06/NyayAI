@@ -17,7 +17,7 @@ const CTA = () => {
         className="mt-8 flex items-center bg-black hover:bg-black/90 shadow-lg transition px-6 text-base py-3 text-white rounded-full"
       >
         <SparklesIcon width={18} />
-        <span className="ml-2">Get My Legal Plan</span>
+        <span className="ml-2">Get Instant Legal Clarity Now</span>
       </button>
 
       <img
