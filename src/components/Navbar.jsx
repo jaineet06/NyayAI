@@ -6,21 +6,57 @@ import { motion, AnimatePresence } from "framer-motion";
 export default function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
-  const [activeLink, setActiveLink] = useState("/#working");
+  const [activeLink, setActiveLink] = useState("");
 
   const navLinks = [
-    { name: "How it works", href: "/#working" },
-    { name: "Legal Areas", href: "/#legalAreas" },
-    { name: "About", href: "/#about" },
+    { name: "About", href: "#about" },
+    { name: "Features", href: "#feature" },
+    { name: "How it works", href: "#working" },
   ];
-
   useEffect(() => {
     const handleScroll = () => {
-      setIsScrolled(window.scrollY > 50);
+      setIsScrolled(window.scrollY > 120);
     };
 
     window.addEventListener("scroll", handleScroll, { passive: true });
     return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
+  useEffect(() => {
+    const observerOptions = {
+      root: null,
+      rootMargin: "-40% 0px -40% 0px",
+      threshold: 0,
+    };
+
+    const observerCallback = (entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          setActiveLink(`#${entry.target.id}`);
+        }
+      });
+    };
+
+    const observer = new IntersectionObserver(
+      observerCallback,
+      observerOptions
+    );
+
+    navLinks.forEach((link) => {
+      const id = link.href.replace("#", "");
+      const element = document.getElementById(id);
+      if (element) observer.observe(element);
+    });
+
+    const handleTopScroll = () => {
+      if (window.scrollY < 100) setActiveLink("");
+    };
+    window.addEventListener("scroll", handleTopScroll);
+
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("scroll", handleTopScroll);
+    };
   }, []);
 
   useEffect(() => {
@@ -31,42 +67,60 @@ export default function Navbar() {
     }
   }, [isOpen]);
 
+  const handleScrollClick = (e, href) => {
+    e.preventDefault();
+    setActiveLink(href);
+    setIsOpen(false);
+
+    const targetId = href.replace("#", "");
+    const element = document.getElementById(targetId);
+
+    if (element) {
+      const yOffset = -100;
+      const y = element.getBoundingClientRect().top + window.scrollY + yOffset;
+
+      window.scrollTo({ top: y, behavior: "smooth" });
+    }
+  };
+
   return (
     <>
       <nav className="fixed top-0 left-0 w-full z-40 pointer-events-none">
         <motion.div
           layout
           transition={{ type: "spring", stiffness: 350, damping: 35 }}
-          className={`pointer-events-auto mx-auto flex items-center justify-between backdrop-blur-md origin-top ${
+          className={`pointer-events-auto mx-auto flex items-center justify-between backdrop-blur-md origin-top bg-transparent ${
             isScrolled
-              ? "w-full md:w-[90%] md:max-w-5xl px-4 py-2.5 bg-white/95 md:border md:border-gray-200 md:shadow-md md:rounded-full md:mt-4"
-              : "w-full px-4 py-4 md:px-16 lg:px-24 xl:px-32 bg-transparent border-gray-200 md:rounded-none md:mt-0"
+              ? "w-full md:w-[90%] md:max-w-5xl px-4 py-2.5 md:border md:border-gray-200 md:shadow-md md:rounded-full md:mt-4 bg-white/70"
+              : "w-full px-4 py-4 md:px-16 lg:px-24 xl:px-32 border-gray-200 md:rounded-none md:mt-0"
           }`}
         >
-          <Link
-            to="/"
-            className="flex items-center gap-2 pl-2"
-            onClick={() => setActiveLink("/")}
+          <button
+            className="flex items-center gap-2 pl-2 cursor-pointer"
+            onClick={() => {
+              window.scrollTo({ top: 0, behavior: "smooth" });
+              setActiveLink("");
+            }}
           >
             <h1 className="font-bold text-xl text-gray-900 tracking-tight">
               NyayaAI
             </h1>
-          </Link>
+          </button>
 
           <motion.div
             layout
             className={`hidden md:flex items-center gap-1 ${
               isScrolled
-                ? "bg-gray-50/80 border border-gray-200/80 rounded-full p-1"
+                ? "bg-gray-50/80 border border-gray-200/80 rounded-full p-1 shadow-inner"
                 : "p-1"
             }`}
           >
             {navLinks.map((link) => (
-              <Link
+              <a
                 key={link.name}
-                to={link.href}
-                onClick={() => setActiveLink(link.href)}
-                className="relative px-4 py-2 text-[16px] font-medium rounded-full"
+                href={link.href}
+                onClick={(e) => handleScrollClick(e, link.href)}
+                className="relative px-4 py-2 text-[15px] font-medium rounded-full cursor-pointer"
               >
                 {activeLink === link.href && (
                   <motion.div
@@ -84,7 +138,7 @@ export default function Navbar() {
                 >
                   {link.name}
                 </span>
-              </Link>
+              </a>
             ))}
           </motion.div>
 
@@ -92,9 +146,9 @@ export default function Navbar() {
             <motion.div layout>
               <Link
                 to="/login"
-                className={`hidden md:flex items-center justify-center gap-3 text-zinc-50 text-[16px] font-medium rounded-full cursor-pointer transition-colors duration-300 ${
+                className={`hidden md:flex items-center justify-center gap-3 text-zinc-50 text-[15px] font-medium rounded-full cursor-pointer transition-all duration-300 ${
                   isScrolled
-                    ? "bg-gradient-to-r from-gray-900 to-gray-700 hover:from-black hover:to-gray-800 pl-5 pr-1.5 py-1.5 shadow-sm"
+                    ? "bg-black hover:bg-gray-800 pl-5 pr-1.5 py-1.5 shadow-md"
                     : "bg-black hover:bg-gray-800 px-5 py-2"
                 }`}
               >
@@ -107,7 +161,7 @@ export default function Navbar() {
 
             <button
               onClick={() => setIsOpen(true)}
-              className="md:hidden p-2 rounded-full hover:bg-gray-100 transition-colors"
+              className="md:hidden p-2 rounded-full hover:bg-gray-100 transition-colors pointer-events-auto"
             >
               <MenuIcon className="size-6 text-gray-800" />
             </button>
@@ -115,11 +169,9 @@ export default function Navbar() {
         </motion.div>
       </nav>
 
-      {/* Redesigned Mobile Menu Side-Drawer */}
       <AnimatePresence>
         {isOpen && (
           <>
-            {/* Backdrop */}
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -128,7 +180,6 @@ export default function Navbar() {
               className="fixed inset-0 bg-black/20 backdrop-blur-sm z-50 md:hidden"
             />
 
-            {/* Drawer */}
             <motion.div
               initial={{ x: "100%" }}
               animate={{ x: 0 }}
@@ -136,7 +187,6 @@ export default function Navbar() {
               transition={{ type: "spring", damping: 25, stiffness: 200 }}
               className="fixed top-0 right-0 h-full w-[80%] max-w-sm bg-white shadow-2xl z-50 flex flex-col md:hidden"
             >
-              {/* Mobile Header */}
               <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100">
                 <h1 className="font-bold text-xl text-gray-900 tracking-tight">
                   NyayaAI
@@ -151,21 +201,18 @@ export default function Navbar() {
 
               <div className="flex flex-col px-6 py-8 gap-6">
                 {navLinks.map((link) => (
-                  <Link
+                  <a
                     key={link.name}
-                    to={link.href}
-                    onClick={() => {
-                      setActiveLink(link.href);
-                      setIsOpen(false);
-                    }}
-                    className={`text-lg font-medium transition-colors ${
+                    href={link.href}
+                    onClick={(e) => handleScrollClick(e, link.href)}
+                    className={`text-lg font-medium transition-colors cursor-pointer ${
                       activeLink === link.href
                         ? "text-gray-900"
                         : "text-gray-500"
                     }`}
                   >
                     {link.name}
-                  </Link>
+                  </a>
                 ))}
               </div>
 

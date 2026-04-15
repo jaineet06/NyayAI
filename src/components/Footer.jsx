@@ -5,11 +5,9 @@ export default function Footer() {
 
   return (
     <footer className="relative bg-[#0a0a0a] text-white pt-20 pb-8 px-6 md:px-16 lg:px-24 xl:px-32 overflow-hidden rounded-t-[2.5rem] mt-20">
-      <div className="absolute bottom-0 left-4 md:left-16 lg:left-24 translate-y-[30%] pointer-events-none z-0 select-none flex justify-center items-center">
-        <div className="absolute inset-0 bg-gradient-to-r from-[#FF9933] via-white to-emerald-600 opacity-[0.08] blur-[80px] rounded-full scale-150 translate-y-10"></div>
-
+      <div className="absolute bottom-0 left-2 md:left-16 lg:left-24 translate-y-[25%] pointer-events-none z-0 select-none flex justify-center items-center">
         <h1
-          className="relative text-[25vw] md:text-[16vw] leading-none font-black tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-[#FF9933] via-gray-200 to-emerald-600 opacity-25"
+          className="relative text-[23vw] md:text-[14vw] leading-none font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-[#FF9933] via-gray-200 to-emerald-600 opacity-25"
           style={{ WebkitTextStroke: "1px rgba(255,255,255,0.1)" }}
         >
           NYAYAAI
