@@ -7,17 +7,27 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-app.post("/ask" , (req, res) =>{
-    const { question } = req.body;
+app.post("/ask", (req, res) => {
+  try {
+    const { question, history } = req.body;
 
-    console.log("question:"  , question);
-    console.log("History", history);
+    console.log("question:", question);
+    console.log("history:", history);
+
     res.json({
-        answer:"Backend working"
-    })
-})
+      answer: "Backend working "
+    });
 
+  } catch (error) {
+    console.error(error);
 
-app.listen( 3000 , () =>{
-    console.log("Server is running on port 3000");
-})
+    res.status(500).json({
+      error: "Internal Server Error",
+      details: error.message
+    });
+  }
+});
+
+app.listen(3000, () => {
+  console.log("Server is running on port 3000");
+});

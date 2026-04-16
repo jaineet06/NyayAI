@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { ArrowUp, Plus } from "lucide-react";
 import { useLocation } from "react-router-dom";
 
@@ -7,6 +7,63 @@ const Chat = ({}) => {
   const initialPrompt = location.state?.initialPrompt || "";
   const [prompt, setPrompt] = useState(initialPrompt);
 
+ 
+
+  const [messages, setMessages] = useState([]);
+  const [loading, setLoading] = useState(false);
+
+   const messagesEndRef = useRef(null);
+
+   const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  useEffect(() => {
+  scrollToBottom();
+}, [messages]);
+
+  const sendMessage = async () => {
+    if (!prompt.trim()) return;
+
+    const userMessage = prompt;
+
+    //  show user message instantly
+    const updatedMessages = [
+      ...messages,
+      { role: "user", content: userMessage },
+    ];
+
+    setMessages(updatedMessages);
+    setPrompt("");
+    setLoading(true);
+
+    try {
+      //  call backend
+      const res = await fetch("http://localhost:3000/ask", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          question: userMessage,
+          history: updatedMessages,
+        }),
+      });
+
+      const data = await res.json();
+
+      // add AI response
+      setMessages((prev) => [
+        ...prev,
+        { role: "assistant", content: data.answer },
+      ]);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const suggestions = [
     "How do I file a consumer complaint for a faulty product?",
     "What are my rights against unfair workplace termination?",
@@ -14,34 +71,56 @@ const Chat = ({}) => {
     "How do I register an FIR for online financial fraud?",
   ];
 
+ 
+
   return (
     <div className="flex flex-col h-full max-w-3xl mx-auto w-full relative">
       <div className="flex-1 overflow-y-auto flex flex-col pb-28 pt-8">
-        <div className="flex flex-col items-center text-center px-4 my-auto">
-          <span className="text-emerald-600 font-medium tracking-wide text-lg mb-2">
-            नमस्ते
-          </span>
+        {messages.length === 0 && (
+          <div className="flex flex-col items-center text-center px-4 my-auto">
+            <span className="text-emerald-600 font-medium tracking-wide text-lg mb-2">
+              नमस्ते
+            </span>
 
-          <h2 className="text-2xl md:text-3xl font-medium text-gray-900 tracking-tight mb-2">
-            How can I help you today?
-          </h2>
-          <p className="text-sm text-gray-500 mb-10 max-w-md">
-            Describe your situation in plain language—Hindi, English, or
-            Hinglish. I will guide you through your legal rights and next steps.
-          </p>
+            <h2 className="text-2xl md:text-3xl font-medium text-gray-900 tracking-tight mb-2">
+              How can I help you today?
+            </h2>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 w-full max-w-2xl text-left">
-            {suggestions.map((suggestion, index) => (
-              <button
-                key={index}
-                onClick={() => setPrompt(suggestion)}
-                className="p-4 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 hover:border-gray-300 transition-all text-sm text-gray-600 text-left"
-              >
-                {suggestion}
-              </button>
-            ))}
+            <p className="text-sm text-gray-500 mb-10 max-w-md">
+              Describe your situation in plain language—Hindi, English, or
+              Hinglish. I will guide you through your legal rights and next
+              steps.
+            </p>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 w-full max-w-2xl text-left">
+              {suggestions.map((suggestion, index) => (
+                <button
+                  key={index}
+                  onClick={() => setPrompt(suggestion)}
+                  className="p-4 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 hover:border-gray-300 transition-all text-sm text-gray-600 text-left"
+                >
+                  {suggestion}
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
+      </div>
+
+      <div className="flex flex-col gap-3 px-4">
+        {messages.map((msg, index) => (
+          <div
+            key={index}
+            className={`p-3 rounded-xl max-w-[80%] text-sm ${
+              msg.role === "user"
+                ? "bg-gray-900 text-white self-end"
+                : "bg-gray-100 text-gray-900 self-start"
+            }`}
+          >
+            {msg.content}
+          </div>
+        ))}
+         <div ref={messagesEndRef} />
       </div>
 
       <div className="mt-auto bg-white pt-4 pb-2 z-10">
@@ -67,12 +146,13 @@ const Chat = ({}) => {
             </button>
 
             <button
+              onClick={sendMessage}
+              disabled={prompt.trim().length === 0}
               className={`flex items-center justify-center p-1.5 rounded-full size-8 transition-colors ${
                 prompt.trim().length > 0
                   ? "bg-gray-900 text-white hover:bg-black shadow-md"
                   : "bg-gray-100 text-gray-400 cursor-not-allowed"
               }`}
-              aria-label="Send prompt"
             >
               <ArrowUp size={18} strokeWidth={2.5} />
             </button>
