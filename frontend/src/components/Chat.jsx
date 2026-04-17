@@ -2,17 +2,47 @@ import { useState, useRef, useEffect } from "react";
 import { ArrowUp, Plus } from "lucide-react";
 import { useLocation } from "react-router-dom";
 
-const Chat = ({}) => {
+
+import { supabase } from "../lib/supabase-clients";
+
+const Chat = ({caseId}) => {
   const location = useLocation();
   const initialPrompt = location.state?.initialPrompt || "";
   const [prompt, setPrompt] = useState(initialPrompt);
+  const [user, setUser] = useState(null);
 
  
-
   const [messages, setMessages] = useState([]);
-  const [loading, setLoading] = useState(false);
+  
 
    const messagesEndRef = useRef(null);
+
+
+   useEffect(() => {
+  const getUser = async () => {
+    const { data } = await supabase.auth.getUser();
+    setUser(data?.user);
+  };
+
+  getUser();
+}, []);
+   
+
+   useEffect(() => {
+  if (!caseId) return;
+
+  const fetchMessages = async () => {
+    const { data } = await supabase
+      .from("messages")
+      .select("*")
+      .eq("case_id", caseId)
+      .order("created_at", { ascending: true });
+
+    setMessages(data || []);
+  };
+
+  fetchMessages();
+}, [caseId]);
 
    const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -22,47 +52,78 @@ const Chat = ({}) => {
   scrollToBottom();
 }, [messages]);
 
-  const sendMessage = async () => {
-    if (!prompt.trim()) return;
+  
+   const sendMessage = async () => {
+  if (!prompt.trim()) return;
+  // if (!caseId) return;
+  // if (!user) return;
 
-    const userMessage = prompt;
+  const userMessage = prompt;
 
-    //  show user message instantly
-    const updatedMessages = [
-      ...messages,
-      { role: "user", content: userMessage },
-    ];
+  const updatedMessages = [
+    ...messages,
+    { role: "user", content: userMessage },
+  ];
 
-    setMessages(updatedMessages);
-    setPrompt("");
-    setLoading(true);
+  setMessages(updatedMessages);
+  setPrompt("");
 
-    try {
-      //  call backend
-      const res = await fetch("http://localhost:3000/ask", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          question: userMessage,
-          history: updatedMessages,
-        }),
-      });
+  try {
 
-      const data = await res.json();
+    const user = await supabase.auth.getUser();
+    const session = await supabase.auth.getSession();
+   const token = session.data.session.access_token;
 
-      // add AI response
-      setMessages((prev) => [
-        ...prev,
-        { role: "assistant", content: data.answer },
-      ]);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  };
+    // 1. Save USER message in DB
+    await supabase.from("messages").insert([
+      {
+        user_id: user.id,
+        case_id: caseId,
+        role: "user",
+        content: userMessage,
+      },
+    ]);
+     
+    
+    // 2. Call backend
+    const res = await fetch("http://localhost:3000/ask", {
+      method: "POST",
+      headers: { "Content-Type": "application/json",
+         Authorization: `Bearer ${token}`
+       },
+      
+      body: JSON.stringify({
+        question: userMessage,
+        history: updatedMessages,
+        caseId,
+        user_id:  user.data.user.id,   
+      }),
+    });
+
+    const data = await res.json();
+    const answer = data?.answer || "Sorry, something went wrong.";
+
+    // 3. Save AI response in DB
+    // await supabase.from("messages").insert([
+    //   {
+    //     user_id: user.id,
+    //     case_id: caseId,
+    //     role: "assistant",
+    //     content: answer,
+    //   },
+    // ]);
+
+    // 4. Update UI
+    setMessages((prev) => [
+      ...prev,
+      { role: "assistant", content: answer },
+    ]);
+
+  } catch (err) {
+    console.error(err);
+  }
+};
+
 
   const suggestions = [
     "How do I file a consumer complaint for a faulty product?",
@@ -75,7 +136,7 @@ const Chat = ({}) => {
 
   return (
     <div className="flex flex-col h-full max-w-3xl mx-auto w-full relative">
-      <div className="flex-1 overflow-y-auto flex flex-col pb-28 pt-8">
+      <div className="flex-1 overflow-y-auto flex flex-col pb-40 pt-8">
         {messages.length === 0 && (
           <div className="flex flex-col items-center text-center px-4 my-auto">
             <span className="text-emerald-600 font-medium tracking-wide text-lg mb-2">

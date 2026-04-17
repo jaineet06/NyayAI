@@ -1,6 +1,7 @@
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
+import { createClient } from "@supabase/supabase-js";
 //import { GoogleGenerativeAI } from "@google/generative-ai";
 
 dotenv.config();
@@ -12,6 +13,12 @@ app.use(express.json());
 
 //const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
+
+
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY
+);
 
 function detectCaseType(question) {
   const q = question.toLowerCase();
@@ -58,9 +65,58 @@ function detectCaseType(question) {
 
 app.post("/ask", async (req, res) => {
   try {
-    const { question, history } = req.body;
-    
+
+    const token = req.headers.authorization?.split(" ")[1];
+
+    const { question, history, caseId } = req.body;
+
+    if (!token) {
+      return res.status(401).json({ error: "No token provided" });
+    }
+
+  
+    const {
+      data: { user },
+      error,
+    } = await supabase.auth.getUser(token);
+
+    if (error || !user) {
+      return res.status(401).json({ error: "Invalid user" });
+    }
+
+   const user_id = user.id; 
     const caseType = detectCaseType(question);
+  //   const { question, history } = req.body;
+
+  //  let caseId = req.body.caseId;
+
+if (!caseId) {
+  const { data: caseData } = await supabase
+    .from("cases")
+    .insert([
+      {
+        user_id,
+        case_type: caseType,
+        title: question.slice(0, 50),
+      },
+    ])
+    .select()
+    .single();
+
+  caseId = caseData.id;
+}
+
+await supabase.from("messages").insert([
+  {
+    user_id,
+    case_id: caseId,
+    role: "user",
+    content: question,
+  },
+]);
+    
+   
+
     console.log("Detected Case Type:", caseType); 
 
     const chatHistory = history
@@ -89,7 +145,6 @@ You MUST prioritize this legal category:
 IMPORTANT RULES:
 1. Always respond ONLY in the exact same language as the user input.
 - If the user writes in English → respond ONLY in simple English
-
 - If the user writes in Hinglish → respond ONLY in Hinglish
 
 Do NOT mix languages inside a single sentence or response.
@@ -160,8 +215,8 @@ User question:
 ${question}
 `;
 
-    const response = await fetch(
-      "https://api.groq.com/openai/v1/chat/completions",
+   const response = await fetch(
+      `https://api.groq.com/openai/v1/chat/completions`,
       {
         method: "POST",
         headers: {
@@ -169,7 +224,7 @@ ${question}
           Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
         },
         body: JSON.stringify({
-          model: "llama-3.1-8b-instant",
+          model:  "llama-3.1-8b-instant", // "llama3-70b-8192"
           messages: [
             {
               role: "system",
@@ -183,14 +238,23 @@ ${question}
           temperature: 0.7,
         }),
       },
-    );
+    );   
 
+    
     const data = await response.json();
 
     const answer =
       data?.choices?.[0]?.message?.content || "No response from AI";
+    await supabase.from("messages").insert([
+  {
+    user_id,
+    case_id: caseId,
+    role: "assistant",
+    content: answer,
+  },
+]);
 
-    res.json({ answer });
+   res.json({ answer, caseId });
   } catch (err) {
     console.error("Groq Error:", err);
     res.status(500).json({ error: "AI failed" });

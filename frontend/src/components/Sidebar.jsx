@@ -10,7 +10,10 @@ import {
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
-const Sidebar = ({ children }) => {
+import { supabase } from "../lib/supabase-clients";
+
+
+const Sidebar = ({ children , setCaseId }) => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
   const navigate = useNavigate();
@@ -30,12 +33,19 @@ const Sidebar = ({ children }) => {
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  const chatHistory = [
-    "Tenant deposit dispute",
-    "RTI for passport delay",
-    "E-commerce refund rights",
-    "Drafting mutual divorce",
-  ];
+    const [cases, setCases] = useState([]);
+    useEffect(() => {
+  const fetchCases = async () => {
+    const { data } = await supabase
+      .from("cases")
+      .select("*")
+      .order("created_at", { ascending: false });
+
+    setCases(data || []);
+  };
+
+  fetchCases();
+}, []);
 
   return (
     <div className="flex h-screen w-full bg-white overflow-hidden font-sans text-gray-900 relative">
@@ -61,33 +71,37 @@ const Sidebar = ({ children }) => {
       >
         <div className="w-[280px] h-full flex flex-col justify-between p-4">
           <div>
-            <button className="w-full flex items-center gap-3 bg-white border border-gray-200 shadow-sm hover:shadow-md transition-all duration-200 px-4 py-3 rounded-xl font-medium text-sm text-gray-900 group">
-              <Plus
-                size={16}
-                className="text-gray-500 group-hover:text-gray-900 transition-colors"
-              />
-              New Legal Query
-            </button>
+           <button
+  onClick={() => setCaseId(null)}
+  className="w-full flex items-center gap-3 bg-white border border-gray-200 shadow-sm hover:shadow-md transition-all duration-200 px-4 py-3 rounded-xl font-medium text-sm text-gray-900 group"
+>
+  <Plus
+    size={16}
+    className="text-gray-500 group-hover:text-gray-900 transition-colors"
+  />
+  New Legal Query
+</button>
 
             <div className="mt-8">
               <p className="text-xs font-bold tracking-widest uppercase text-gray-400 mb-3 px-2">
                 Recent Cases
               </p>
               <div className="flex flex-col gap-1">
-                {chatHistory.map((title, index) => (
-                  <button
-                    key={index}
-                    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-gray-200/50 text-left transition-colors group"
-                  >
-                    <MessageSquare
-                      size={14}
-                      className="text-gray-400 group-hover:text-gray-600 shrink-0"
-                    />
-                    <span className="text-sm text-gray-600 group-hover:text-gray-900 truncate">
-                      {title}
-                    </span>
-                  </button>
-                ))}
+                {cases.map((caseItem) => (
+  <button
+    key={caseItem.id}
+    onClick={() => setCaseId(caseItem.id)}
+    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-gray-200/50 text-left transition-colors group"
+  >
+    <MessageSquare
+      size={14}
+      className="text-gray-400 group-hover:text-gray-600 shrink-0"
+    />
+    <span className="text-sm text-gray-600 group-hover:text-gray-900 truncate">
+      {caseItem.title}
+    </span>
+  </button>
+))}
               </div>
             </div>
           </div>

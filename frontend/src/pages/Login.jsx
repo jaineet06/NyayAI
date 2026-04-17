@@ -11,9 +11,73 @@ import {
   ShieldCheck,
 } from "lucide-react";
 
+import { supabase } from "../lib/supabase-clients";
+import { useNavigate } from "react-router-dom";
+
 const Login = () => {
   const [isLogin, setIsLogin] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
+
+  const navigate = useNavigate();
+
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [name, setName] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const handleAuth = async () => {
+    try {
+      setLoading(true);
+
+      if (!isLogin) {
+        // SIGN UP
+        const { data: authData, error } = await supabase.auth.signUp({
+          email,
+          password,
+        });
+
+        const user = authData?.user;
+
+        if (!user) {
+          console.error("User not created yet");
+          return;
+        }
+
+        if (error) throw error;
+
+        // create profile
+        const userId = data.user?.id;
+        if (!userId) throw new Error("User not created");
+
+        await supabase.from("profiles").insert([
+          {
+            user_id: userId,
+            name,
+            email,
+          },
+        ]);
+
+        alert("Account created!");
+      } else {
+        // SIGN IN
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+
+        if (error) throw error;
+
+        alert("Login successful!");
+      }
+
+      navigate("/dashboard"); // redirect after login
+    } catch (err) {
+      console.error(err);
+      alert(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="min-h-screen w-full flex bg-white font-sans">
@@ -62,6 +126,8 @@ const Login = () => {
                       <input
                         type="text"
                         placeholder="e.g. John Doe"
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
                         className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3.5 text-sm text-gray-900 placeholder:text-gray-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-600/20 focus:border-emerald-600 transition-all"
                       />
                     </div>
@@ -77,6 +143,8 @@ const Login = () => {
                     <input
                       type="email"
                       placeholder="you@example.com"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
                       className="w-full bg-gray-50 border border-gray-200 rounded-xl pl-11 pr-4 py-3.5 text-sm text-gray-900 placeholder:text-gray-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-600/20 focus:border-emerald-600 transition-all"
                     />
                   </div>
@@ -101,6 +169,8 @@ const Login = () => {
                     <input
                       type={showPassword ? "text" : "password"}
                       placeholder="••••••••"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
                       className="w-full bg-gray-50 border border-gray-200 rounded-xl pl-11 pr-12 py-3.5 text-sm text-gray-900 placeholder:text-gray-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-600/20 focus:border-emerald-600 transition-all"
                     />
                     <button
@@ -113,7 +183,12 @@ const Login = () => {
                   </div>
                 </div>
 
-                <button className="w-full mt-2 bg-gray-900 hover:bg-black text-white rounded-xl py-3.5 flex items-center justify-center gap-2 font-medium text-sm transition-all shadow-sm active:scale-[0.98]">
+                <button
+                  type="button"
+                  onClick={handleAuth}
+                  disabled={loading}
+                  className="w-full mt-2 bg-gray-900 hover:bg-black text-white rounded-xl py-3.5 flex items-center justify-center gap-2 font-medium text-sm"
+                >
                   {isLogin ? "Sign In" : "Create Account"}
                   <ArrowRight size={16} />
                 </button>

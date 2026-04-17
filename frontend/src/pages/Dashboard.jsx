@@ -1,11 +1,14 @@
-import React from "react";
+
+import { useState } from "react";
 import Sidebar from "../components/Sidebar";
 import Chat from "../components/Chat";
 
 const Dashboard = () => {
+  const [caseId, setCaseId] = useState(null);
+
   return (
     <Sidebar>
-      <Chat />
+      <Chat caseId={caseId} setCaseId={setCaseId} />
     </Sidebar>
   );
 };
