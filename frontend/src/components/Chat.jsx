@@ -2,128 +2,125 @@ import { useState, useRef, useEffect } from "react";
 import { ArrowUp, Plus } from "lucide-react";
 import { useLocation } from "react-router-dom";
 
-
 import { supabase } from "../lib/supabase-clients";
+import ReactMarkdown from "react-markdown";
+import { usePdfExport } from "../hooks/usePdfExport";
+import { Download } from "lucide-react";
 
-const Chat = ({caseId}) => {
+const Chat = ({ caseId }) => {
+  const { exportToPdf } = usePdfExport();
   const location = useLocation();
   const initialPrompt = location.state?.initialPrompt || "";
   const [prompt, setPrompt] = useState(initialPrompt);
   const [user, setUser] = useState(null);
+  const [currentCaseId, setCurrentCaseId] = useState(caseId);
 
- 
   const [messages, setMessages] = useState([]);
-  
 
-   const messagesEndRef = useRef(null);
+  const messagesEndRef = useRef(null);
 
+  useEffect(() => {
+    const getUser = async () => {
+      const { data } = await supabase.auth.getUser();
+      setUser(data?.user);
+    };
+     
+    getUser();
+  }, []);
 
-   useEffect(() => {
-  const getUser = async () => {
-    const { data } = await supabase.auth.getUser();
-    setUser(data?.user);
-  };
+  useEffect(() => {
+    if (!caseId) return;
 
-  getUser();
-}, []);
-   
+    const fetchMessages = async () => {
+      const { data } = await supabase
+        .from("messages")
+        .select("*")
+        .eq("case_id", caseId)
+        .order("created_at", { ascending: true });
 
-   useEffect(() => {
-  if (!caseId) return;
+      setMessages(data || []);
+    };
 
-  const fetchMessages = async () => {
-    const { data } = await supabase
-      .from("messages")
-      .select("*")
-      .eq("case_id", caseId)
-      .order("created_at", { ascending: true });
+    fetchMessages();
+  }, [caseId]);
 
-    setMessages(data || []);
-  };
+  // Add at top of Chat component
+const isDocumentMessage = (content) => {
+  return (
+    content.includes("To,") &&
+    content.includes("Subject:") &&
+    content.includes("Yours faithfully")
+  );
+};
 
-  fetchMessages();
-}, [caseId]);
-
-   const scrollToBottom = () => {
+  const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
   useEffect(() => {
-  scrollToBottom();
-}, [messages]);
+    scrollToBottom();
+  }, [messages]);
 
-  
-   const sendMessage = async () => {
-  if (!prompt.trim()) return;
-  // if (!caseId) return;
-  // if (!user) return;
-
-  const userMessage = prompt;
-
-  const updatedMessages = [
-    ...messages,
-    { role: "user", content: userMessage },
-  ];
-
-  setMessages(updatedMessages);
-  setPrompt("");
-
-  try {
-
-    const user = await supabase.auth.getUser();
-    const session = await supabase.auth.getSession();
-   const token = session.data.session.access_token;
-
-    // 1. Save USER message in DB
-    await supabase.from("messages").insert([
-      {
-        user_id: user.id,
-        case_id: caseId,
-        role: "user",
-        content: userMessage,
-      },
-    ]);
-     
+  const sendMessage = async () => {
+    if (!prompt.trim()) return;
     
-    // 2. Call backend
-    const res = await fetch("http://localhost:3000/ask", {
-      method: "POST",
-      headers: { "Content-Type": "application/json",
-         Authorization: `Bearer ${token}`
-       },
+    const userMessage = prompt;
+
+    const updatedMessages = [
+      ...messages,
+      { role: "user", content: userMessage },
+    ];
+
+    setMessages(updatedMessages);
+    setPrompt("");
+
+    try {
       
-      body: JSON.stringify({
-        question: userMessage,
-        history: updatedMessages,
-        caseId,
-        user_id:  user.data.user.id,   
-      }),
-    });
+     const { data: sessionData, error } = await supabase.auth.getSession();
 
-    const data = await res.json();
-    const answer = data?.answer || "Sorry, something went wrong.";
+if (error || !sessionData?.session) {
+  console.error("No active session");
+  return;
+}
 
-    // 3. Save AI response in DB
-    // await supabase.from("messages").insert([
-    //   {
-    //     user_id: user.id,
-    //     case_id: caseId,
-    //     role: "assistant",
-    //     content: answer,
-    //   },
-    // ]);
+const token = sessionData.session.access_token;
 
-    // 4. Update UI
-    setMessages((prev) => [
-      ...prev,
-      { role: "assistant", content: answer },
-    ]);
+      if (!token) {
+        console.error("No token found");
+        return;
+      }
 
-  } catch (err) {
-    console.error(err);
-  }
-};
+      console.log("TOKEN:", token);
 
+      // 2. Call backend
+      const res = await fetch("http://localhost:3000/ask", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+
+        body: JSON.stringify({
+          question: userMessage,
+          history: updatedMessages,
+          caseId: currentCaseId,
+          
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!currentCaseId && data.caseId) {
+  setCurrentCaseId(data.caseId); 
+}
+      const answer = data?.answer || "Sorry, something went wrong.";
+
+      // 4. Update UI
+      setMessages((prev) => [...prev, { role: "assistant", content: answer }]);
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   const suggestions = [
     "How do I file a consumer complaint for a faulty product?",
@@ -132,58 +129,94 @@ const Chat = ({caseId}) => {
     "How do I register an FIR for online financial fraud?",
   ];
 
- 
-
   return (
-    <div className="flex flex-col h-full max-w-3xl mx-auto w-full relative">
-      <div className="flex-1 overflow-y-auto flex flex-col pb-40 pt-8">
-        {messages.length === 0 && (
-          <div className="flex flex-col items-center text-center px-4 my-auto">
-            <span className="text-emerald-600 font-medium tracking-wide text-lg mb-2">
-              नमस्ते
-            </span>
+    <div className="flex flex-col h-full max-w-3xl mx-auto w-full relative overflow-hidden">
+     
+     
+<div className="flex-1 overflow-y-auto flex flex-col gap-3 px-4 pt-8 pb-6">
+  
+  {messages.length === 0 && (
+    <div className="flex flex-col items-center text-center px-4 my-auto">
+      <span className="text-emerald-600 font-medium tracking-wide text-lg mb-2">
+        नमस्ते
+      </span>
+      <h2 className="text-2xl md:text-3xl font-medium text-gray-900 tracking-tight mb-2">
+        How can I help you today?
+      </h2>
+      <p className="text-sm text-gray-500 mb-10 max-w-md">
+        Describe your situation in plain language—Hindi, English, or
+        Hinglish. I will guide you through your legal rights and next steps.
+      </p>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 w-full max-w-2xl text-left">
+        {suggestions.map((suggestion, index) => (
+          <button
 
-            <h2 className="text-2xl md:text-3xl font-medium text-gray-900 tracking-tight mb-2">
-              How can I help you today?
-            </h2>
-
-            <p className="text-sm text-gray-500 mb-10 max-w-md">
-              Describe your situation in plain language—Hindi, English, or
-              Hinglish. I will guide you through your legal rights and next
-              steps.
-            </p>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 w-full max-w-2xl text-left">
-              {suggestions.map((suggestion, index) => (
-                <button
-                  key={index}
-                  onClick={() => setPrompt(suggestion)}
-                  className="p-4 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 hover:border-gray-300 transition-all text-sm text-gray-600 text-left"
-                >
-                  {suggestion}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
-
-      <div className="flex flex-col gap-3 px-4">
-        {messages.map((msg, index) => (
-          <div
             key={index}
-            className={`p-3 rounded-xl max-w-[80%] text-sm ${
-              msg.role === "user"
-                ? "bg-gray-900 text-white self-end"
-                : "bg-gray-100 text-gray-900 self-start"
-            }`}
+            onClick={() => setPrompt(suggestion)}
+            className="p-4 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 hover:border-gray-300 transition-all text-sm text-gray-600 text-left"
           >
-            {msg.content}
-          </div>
+            {suggestion}
+          </button>
         ))}
-         <div ref={messagesEndRef} />
       </div>
+    </div>
+  )}
 
+  
+ {messages.map((msg, index) => (
+  <div
+    key={index}
+    className={`flex flex-col gap-2 max-w-[80%] ${
+      msg.role === "user" ? "self-end" : "self-start"
+    }`}
+  >
+    <div
+      className={`p-3 rounded-xl text-sm ${
+        msg.role === "user"
+          ? "bg-gray-900 text-white"
+          : "bg-gray-100 text-gray-900"
+      }`}
+    >
+      <ReactMarkdown
+        components={{
+          p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
+          strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
+          ul: ({ children }) => <ul className="list-disc pl-4 space-y-1 mb-2">{children}</ul>,
+          ol: ({ children }) => <ol className="list-decimal pl-4 space-y-1 mb-2">{children}</ol>,
+          li: ({ children }) => <li className="text-sm">{children}</li>,
+          hr: () => <hr className="border-gray-200 my-3" />,
+          h1: ({ children }) => <h1 className="font-bold text-base mb-1">{children}</h1>,
+          h2: ({ children }) => <h2 className="font-bold text-sm mb-1">{children}</h2>,
+          code: ({ children }) => (
+            <pre className="bg-gray-800 text-gray-400 text-xs rounded-lg p-3 my-2 whitespace-pre-wrap overflow-x-auto">
+              {children}
+            </pre>
+          ),
+        }}
+      >
+        {msg.content}
+      </ReactMarkdown>
+    </div>
+
+    {/* PDF Download button — only shows on document messages */}
+    {msg.role === "assistant" && isDocumentMessage(msg.content) && (
+      <button
+        onClick={() =>
+          exportToPdf(
+            msg.content,
+            `NyayaAI_Document_${new Date().toLocaleDateString("en-IN").replace(/\//g, "-")}`
+          )
+        }
+        className="flex items-center gap-2 self-start px-4 py-2 bg-gray-900 hover:bg-gray-1000 text-white text-xs font-medium rounded-xl transition-colors shadow-sm"
+      >
+        <Download size={14} />
+        Download as PDF
+      </button>
+    )}
+  </div>
+))}
+  <div ref={messagesEndRef} />
+</div>
       <div className="mt-auto bg-white pt-4 pb-2 z-10">
         <div className="w-full bg-white border border-gray-200 shadow-[0_8px_30px_rgb(0,0,0,0.06)] rounded-2xl overflow-hidden transition-all focus-within:ring-2 focus-within:ring-gray-900/10 focus-within:border-gray-300">
           <textarea

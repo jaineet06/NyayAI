@@ -1,181 +1,172 @@
-import { useState, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import {
-  PanelLeftClose,
-  PanelLeftOpen,
-  Plus,
-  MessageSquare,
-  Settings,
-  LogOut,
-} from "lucide-react";
-import { useNavigate } from "react-router-dom";
 
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { LogOut, Scale, Plus, MessageSquare } from "lucide-react";
 import { supabase } from "../lib/supabase-clients";
 
-
-const Sidebar = ({ children , setCaseId }) => {
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  const [isMobile, setIsMobile] = useState(false);
+const Sidebar = ({ children, onSelectCase , onNewChat }) => {
+  const [profile, setProfile] = useState(null);
+  const [cases, setCases] = useState([]);
+  const [activeCaseId, setActiveCaseId] = useState(null);
   const navigate = useNavigate();
+
   useEffect(() => {
-    const handleResize = () => {
-      const mobile = window.innerWidth < 768;
-      setIsMobile(mobile);
-      if (mobile) {
-        setIsSidebarOpen(false);
-      } else {
-        setIsSidebarOpen(true);
-      }
+    const fetchData = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // Fetch profile
+      const { data: profileData } = await supabase
+        .from("profiles")
+        .select("full_name, email")
+        .eq("id", user.id)
+        .single();
+
+      setProfile(profileData);
+
+      // Fetch cases with latest message as preview
+      const { data: casesData } = await supabase
+        .from("cases")
+        .select("id, title, created_at")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false });
+
+      setCases(casesData || []);
     };
 
-    handleResize();
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
+    fetchData();
   }, []);
 
-    const [cases, setCases] = useState([]);
-    useEffect(() => {
-  const fetchCases = async () => {
-    const { data } = await supabase
-      .from("cases")
-      .select("*")
-      .order("created_at", { ascending: false });
-
-    setCases(data || []);
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+    navigate("/login");
   };
 
-  fetchCases();
-}, []);
+  const handleSelectCase = (caseId) => {
+    setActiveCaseId(caseId);
+    onSelectCase?.(caseId);
+  };
+
+  const handleNewChat = () => {
+    setActiveCaseId(null);
+    onSelectCase?.(null);
+  };
+
+  // Group cases by date
+  const groupByDate = (cases) => {
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+
+    const groups = { Today: [], Yesterday: [], Earlier: [] };
+
+    cases.forEach((c) => {
+      const d = new Date(c.created_at);
+      if (d.toDateString() === today.toDateString()) groups.Today.push(c);
+      else if (d.toDateString() === yesterday.toDateString()) groups.Yesterday.push(c);
+      else groups.Earlier.push(c);
+    });
+
+    return groups;
+  };
+
+  const grouped = groupByDate(cases);
 
   return (
-    <div className="flex h-screen w-full bg-white overflow-hidden font-sans text-gray-900 relative">
-      <AnimatePresence>
-        {isMobile && isSidebarOpen && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={() => setIsSidebarOpen(false)}
-            className="fixed inset-0 bg-black/20 backdrop-blur-sm z-40 md:hidden"
-          />
-        )}
-      </AnimatePresence>
+    <div className="flex h-screen bg-white">
+      {/* Sidebar */}
+      <div className="w-64 bg-gray-50 border-r border-gray-200 flex flex-col h-full shrink-0">
 
-      <motion.aside
-        initial={false}
-        animate={{ width: isSidebarOpen ? 280 : 0 }}
-        transition={{ type: "spring", bounce: 0, duration: 0.4 }}
-        className={`h-full bg-[#f9f9f9] border-r border-gray-200 flex flex-col shrink-0 overflow-hidden ${
-          isMobile ? "absolute left-0 top-0 z-50 shadow-2xl" : "relative z-20"
-        }`}
-      >
-        <div className="w-[280px] h-full flex flex-col justify-between p-4">
-          <div>
-           <button
-  onClick={() => setCaseId(null)}
-  className="w-full flex items-center gap-3 bg-white border border-gray-200 shadow-sm hover:shadow-md transition-all duration-200 px-4 py-3 rounded-xl font-medium text-sm text-gray-900 group"
->
-  <Plus
-    size={16}
-    className="text-gray-500 group-hover:text-gray-900 transition-colors"
-  />
-  New Legal Query
-</button>
-
-            <div className="mt-8">
-              <p className="text-xs font-bold tracking-widest uppercase text-gray-400 mb-3 px-2">
-                Recent Cases
-              </p>
-              <div className="flex flex-col gap-1">
-                {cases.map((caseItem) => (
-  <button
-    key={caseItem.id}
-    onClick={() => setCaseId(caseItem.id)}
-    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-gray-200/50 text-left transition-colors group"
-  >
-    <MessageSquare
-      size={14}
-      className="text-gray-400 group-hover:text-gray-600 shrink-0"
-    />
-    <span className="text-sm text-gray-600 group-hover:text-gray-900 truncate">
-      {caseItem.title}
-    </span>
-  </button>
-))}
-              </div>
-            </div>
-          </div>
-
-          <div className="border-t border-gray-200 pt-4 flex flex-col gap-1">
-            <button className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-gray-200/50 text-left transition-colors group">
-              <Settings
-                size={16}
-                className="text-gray-400 group-hover:text-gray-600 shrink-0"
-              />
-              <span className="text-sm text-gray-600 group-hover:text-gray-900">
-                Settings
-              </span>
-            </button>
-            <button className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-red-50 text-left transition-colors group">
-              <LogOut
-                size={16}
-                className="text-red-400 group-hover:text-red-600 shrink-0"
-              />
-              <span className="text-sm text-red-500 group-hover:text-red-600">
-                Sign Out
-              </span>
-            </button>
-
-            <div className="mt-2 flex items-center gap-3 px-3 py-2">
-              <div className="size-8 rounded-full bg-gray-900 text-white flex items-center justify-center text-xs font-bold shrink-0">
-                JD
-              </div>
-              <div className="flex flex-col overflow-hidden">
-                <span className="text-sm font-medium text-gray-900 truncate">
-                  John Doe
-                </span>
-                <span className="text-xs text-gray-500 truncate">
-                  Free Plan
-                </span>
-              </div>
-            </div>
+        {/* Logo */}
+        <div className="px-6 py-5 border-b border-gray-200">
+          <div className="flex items-center gap-2">
+            <Scale size={20} className="text-emerald-600" />
+            <span className="font-bold text-gray-900 text-lg">NyayaAI</span>
           </div>
         </div>
-      </motion.aside>
 
-      <main className="flex-1 flex flex-col h-full relative min-w-0">
-        <header className="h-14 flex items-center px-4 absolute top-0 left-0 w-full z-10 bg-white/80 backdrop-blur-sm border-b border-transparent transition-colors">
+        {/* New Chat */}
+        <div className="px-4 py-4">
           <button
-            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-            className="p-2 rounded-lg text-gray-500 hover:bg-gray-100 hover:text-gray-900 transition-colors flex items-center justify-center"
-            aria-label="Toggle Sidebar"
+            onClick={onNewChat}
+            className="w-full flex items-center gap-2 px-4 py-2.5 bg-gray-900 hover:bg-black text-white rounded-xl text-sm font-medium transition-colors"
           >
-            {isSidebarOpen && !isMobile ? (
-              <PanelLeftClose size={20} strokeWidth={2} />
-            ) : (
-              <PanelLeftOpen size={20} strokeWidth={2} />
-            )}
+            <Plus size={16} />
+            New Chat
           </button>
-
-          <AnimatePresence>
-            {(!isSidebarOpen || isMobile) && (
-              <motion.h1
-                initial={{ opacity: 0, x: -10 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -10 }}
-                className="font-bold text-lg text-gray-900 tracking-tight ml-3 cursor-pointer"
-                onClick={() => navigate("/")}
-              >
-                NyayaAI
-              </motion.h1>
-            )}
-          </AnimatePresence>
-        </header>
-
-        <div className="flex-1 overflow-y-auto pt-14 px-2 md:px-12">
-          {children}
         </div>
-      </main>
+
+        {/* Cases grouped by date */}
+        <div className="flex-1 overflow-y-auto px-3 pb-4 space-y-4">
+          {Object.entries(grouped).map(([label, items]) =>
+            items.length === 0 ? null : (
+              <div key={label}>
+                <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest px-2 mb-1">
+                  {label}
+                </p>
+                <div className="space-y-0.5">
+                  {items.map((c) => (
+                    <button
+                      key={c.id}
+                      onClick={() => handleSelectCase(c.id)}
+                      className={`w-full flex items-start gap-2.5 px-3 py-2.5 rounded-xl text-left transition-colors group ${
+                        activeCaseId === c.id
+                          ? "bg-gray-200 text-gray-900"
+                          : "hover:bg-gray-100 text-gray-600"
+                      }`}
+                    >
+                      <MessageSquare
+                        size={14}
+                        className="shrink-0 mt-0.5 text-gray-400"
+                      />
+                      <span className="text-xs truncate leading-5">
+                        {c.title || "Untitled case"}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )
+          )}
+
+          {cases.length === 0 && (
+            <p className="text-xs text-gray-400 text-center mt-8 px-4">
+              No cases yet. Start a conversation!
+            </p>
+          )}
+        </div>
+
+        {/* User info + sign out */}
+        <div className="border-t border-gray-200 px-4 py-4">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="size-8 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center font-semibold text-sm shrink-0">
+                {profile?.full_name?.charAt(0)?.toUpperCase() || "?"}
+              </div>
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-gray-900 truncate">
+                  {profile?.full_name || "User"}
+                </p>
+                <p className="text-xs text-gray-400 truncate">
+                  {profile?.email || ""}
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={handleSignOut}
+              className="text-gray-400 hover:text-red-500 transition-colors shrink-0"
+              title="Sign out"
+            >
+              <LogOut size={18} />
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Main content */}
+      <div className="flex-1 overflow-hidden flex flex-col">
+        {children}
+      </div>
     </div>
   );
 };

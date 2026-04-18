@@ -5,10 +5,16 @@ import Chat from "../components/Chat";
 
 const Dashboard = () => {
   const [caseId, setCaseId] = useState(null);
+  const [chatKey, setChatKey] = useState(0);
+
+  const handleNewChat = () => {
+    setCaseId(null);
+    setChatKey((prev) => prev + 1); 
+  };
 
   return (
-    <Sidebar>
-      <Chat caseId={caseId} setCaseId={setCaseId} />
+    <Sidebar onSelectCase={setCaseId} onNewChat={handleNewChat}>
+      <Chat key={chatKey} caseId={caseId} setCaseId={setCaseId} />
     </Sidebar>
   );
 };

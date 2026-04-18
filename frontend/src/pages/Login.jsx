@@ -26,58 +26,39 @@ const Login = () => {
   const [loading, setLoading] = useState(false);
 
   const handleAuth = async () => {
-    try {
-      setLoading(true);
+  try {
+    setLoading(true);
 
-      if (!isLogin) {
-        // SIGN UP
-        const { data: authData, error } = await supabase.auth.signUp({
-          email,
-          password,
-        });
-
-        const user = authData?.user;
-
-        if (!user) {
-          console.error("User not created yet");
-          return;
-        }
-
-        if (error) throw error;
-
-        // create profile
-        const userId = data.user?.id;
-        if (!userId) throw new Error("User not created");
-
-        await supabase.from("profiles").insert([
-          {
-            user_id: userId,
-            name,
-            email,
+    if (!isLogin) {
+      const { data: authData, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            full_name: name,  
           },
-        ]);
+        },
+      });
 
-        alert("Account created!");
-      } else {
-        // SIGN IN
-        const { data, error } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
-
-        if (error) throw error;
-
-        alert("Login successful!");
-      }
-
-      navigate("/dashboard"); // redirect after login
-    } catch (err) {
-      console.error(err);
-      alert(err.message);
-    } finally {
-      setLoading(false);
+      if (error) throw error;
+      alert("Account created!");
+    } else {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+      if (error) throw error;
+      alert("Login successful!");
     }
-  };
+
+    navigate("/dashboard");
+  } catch (err) {
+    console.error(err);
+    alert(err.message);
+  } finally {
+    setLoading(false);
+  }
+};
 
   return (
     <div className="min-h-screen w-full flex bg-white font-sans">

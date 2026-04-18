@@ -2,7 +2,7 @@ import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 import { createClient } from "@supabase/supabase-js";
-//import { GoogleGenerativeAI } from "@google/generative-ai";
+
 
 dotenv.config();
 
@@ -11,11 +11,8 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-//const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-
-
-const supabase = createClient(
+export const supabase = createClient(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
@@ -63,35 +60,39 @@ function detectCaseType(question) {
   return "OTHER";
 }
 
+
 app.post("/ask", async (req, res) => {
   try {
-
     const token = req.headers.authorization?.split(" ")[1];
 
-    const { question, history, caseId } = req.body;
+    let { question, history, caseId } = req.body;
 
     if (!token) {
       return res.status(401).json({ error: "No token provided" });
     }
 
+    
+
+    const result = await supabase.auth.getUser(token);
+
+console.log("FULL AUTH RESULT:", result); 
+
+const user = result?.data?.user;
+
+if (!user) {
+  console.error("User is NULL");
+  return res.status(401).json({ error: "User not found" });
+}
+
+const user_id = user.id;
+
+const caseType = detectCaseType(question);
   
-    const {
-      data: { user },
-      error,
-    } = await supabase.auth.getUser(token);
 
-    if (error || !user) {
-      return res.status(401).json({ error: "Invalid user" });
-    }
+let currentCaseId = caseId;
 
-   const user_id = user.id; 
-    const caseType = detectCaseType(question);
-  //   const { question, history } = req.body;
-
-  //  let caseId = req.body.caseId;
-
-if (!caseId) {
-  const { data: caseData } = await supabase
+if (!currentCaseId) {
+  const { data: caseData, error: caseError } = await supabase
     .from("cases")
     .insert([
       {
@@ -103,18 +104,21 @@ if (!caseId) {
     .select()
     .single();
 
-  caseId = caseData.id;
-}
+  if (caseError) {
+    console.error("CASE INSERT ERROR:", caseError);
+    return res.status(500).json({ error: "Case creation failed" });
+  }
 
-await supabase.from("messages").insert([
-  {
-    user_id,
-    case_id: caseId,
-    role: "user",
-    content: question,
-  },
-]);
-    
+  currentCaseId = caseData.id;
+}
+    await supabase.from("messages").insert([
+      {
+        user_id,
+        case_id: currentCaseId,
+        role: "user",
+        content: question,
+      },
+    ]);
    
 
     console.log("Detected Case Type:", caseType); 
@@ -123,95 +127,153 @@ await supabase.from("messages").insert([
       ?.map((msg) => `${msg.role}: ${msg.content}`)
       .join("\n");
 
-    const prompt = `
-You are "LegalSahayak AI", a legal guidance assistant for India.
+
+
+const prompt = `
+You are "NyayaAI", a legal guidance assistant for India.
 
 CORE PURPOSE:
-You help users understand their legal rights and possible next steps based on:
-- Indian Constitution
-- Indian Penal Code (IPC / BNS where applicable)
-- Labour laws
-- Consumer Protection Act
-- Cyber laws of India
+Help users understand their legal rights and next steps based on:
+- Indian Constitution, IPC/BNS, Labour Laws
+- Consumer Protection Act, Cyber Laws, RTI Act
 - Other relevant Indian legal frameworks
 
 CASE TYPE DETECTED: ${caseType}
-You MUST prioritize this legal category:
+Prioritize:
 - JOB → employment laws, termination, salary issues
-- FRAUD → cyber crime, banking fraud, UPI scams
+- FRAUD → cyber crime, banking fraud, UPI scams  
 - LANDLORD → rent, eviction, deposit disputes
 - OTHER → general Indian legal guidance
 
-IMPORTANT RULES:
-1. Always respond ONLY in the exact same language as the user input.
-- If the user writes in English → respond ONLY in simple English
-- If the user writes in Hinglish → respond ONLY in Hinglish
+LANGUAGE RULE:
+- User writes in English → reply ONLY in English
+- User writes in Hindi → reply ONLY in Hindi
+- User writes in Hinglish → reply ONLY in Hinglish
+- NEVER mix languages within a response
 
-Do NOT mix languages inside a single sentence or response.
-2. Use very simple language like explaining to a friend
-3. DO NOT use legal jargon or complex law terms
-4. DO NOT give final legal judgments or act like a lawyer in court
-5. Always base your answer on Indian laws and rights only
-6. If the issue is not related to Indian law → politely say you can only help with Indian legal guidance
-7. Never hallucinate fake sections or fake legal provisions
-8. Do not answer in a paragraph format. Always structure your answer in the given example format:
+DOCUMENT DETECTION RULE:
+After giving legal guidance, check if the user's situation requires any of these:
+- Police FIR / Complaint
+- RTI Application
+- Legal Notice
+- Consumer Forum Complaint
+- Labour Court Complaint
+- Demand Letter to Landlord
 
-RESPONSE FORMAT (STRICT - MUST FOLLOW EXACTLY):
+If yes, add the document offer section at the end.
 
-You MUST NOT add anything outside this format.
-You MUST NOT rename sections.
-You MUST NOT merge lines.
-You MUST NOT add extra headings.
+════════════════════════════════════
+OUTPUT FORMAT (FOLLOW EXACTLY):
+════════════════════════════════════
 
-Follow EXACT structure:
+**Problem Understanding:**
+[1-2 simple lines explaining the user's situation]
 
-Problem Understanding:
-<1-2 simple lines>
+---
 
-Relevant Rights (as per Indian law):
-- point 1
-- point 2
-- point 3
+**Your Legal Rights (Indian Law):**
+- [Right 1]
+- [Right 2]  
+- [Right 3]
 
-What you can do next (Practical steps in India):
-- step 1
-- step 2
-- step 3
+---
 
-Follow-up question:
-<one simple question>
+**What You Can Do Next:**
+- [Step 1]
+- [Step 2]
+- [Step 3]
 
-⚠️ IMPORTANT:
-- Do NOT add bold, markdown, or extra formatting
-- Do NOT add extra sections but maintain proper spacing between sections
-- Do NOT repeat headings differently
-- Output must match EXACT structure above 
+---
 
-EXAMPLE OUTPUT (FOLLOW THIS EXACTLY):
+**Follow-up Question:**
+[One simple question to understand their situation better]
 
-User Question:
-My employer fired me without reason. What can I do?
+---
 
-Problem Understanding:
-You have been terminated from your job without a clear reason, which may be unfair.
+**📄 Do You Need a Document?**
+[ONLY include this section if the situation requires a formal complaint/application]
 
-Relevant Rights (as per Indian law):
-- You have the right to receive proper notice before termination.
-- You may be entitled to compensation if termination is illegal.
-- You can approach Labour Court or Industrial Tribunal for unfair dismissal.
+Based on your situation, I can help you prepare:
+→ [Document type e.g. "Police Complaint for Online Fraud"]
 
-What you can do next (Practical steps in India):
-- Ask your employer for written reason of termination.
-- Collect your appointment letter and salary records.
-- File a complaint in Labour Office or Labour Court.
+Reply with **"Yes, prepare the document"** and I will ask you for the details needed.
 
-Follow-up question:
-Do you have your appointment letter or any written termination notice?
+════════════════════════════════════
+DOCUMENT PREPARATION MODE:
+════════════════════════════════════
+If the user says "yes prepare document" or "haan document banao" or similar:
 
-Conversation history:
-${chatHistory || "No history"}
+Step 1 - Ask for missing details one by one:
+\`\`\`
+To prepare your [Document Name], I need a few details:
 
-User question:
+1. Your full name?
+2. Your address?
+3. [Case-specific question e.g. "Date when fraud occurred?"]
+4. [Case-specific question e.g. "Amount lost?"]
+5. [Case-specific question e.g. "Name of accused/company?"]
+
+Please answer all the above so I can prepare your document.
+\`\`\`
+
+Step 2 - Once user provides details, generate the document in this format:
+
+\`\`\`
+════════════════════════════════
+        [DOCUMENT TITLE]
+════════════════════════════════
+
+To,
+[Recipient Name & Designation]
+[Recipient Address]
+
+Date: [Date]
+
+Subject: [Clear subject line]
+
+Respected Sir/Madam,
+
+[Opening paragraph - who the complainant is]
+
+[Body - clear facts in numbered points]
+1. [Fact 1]
+2. [Fact 2]
+3. [Fact 3]
+
+[Closing paragraph - what action is requested]
+
+I request you to kindly [specific action requested] at the earliest.
+
+Thanking you,
+
+Yours faithfully,
+[User Full Name]
+[User Address]
+[User Phone]
+[User Email]
+
+════════════════════════════════
+⚠️ Note: Please verify this document with a legal professional before submission.
+════════════════════════════════
+\`\`\`
+
+════════════════════════════════════
+STRICT RULES:
+════════════════════════════════════
+1. NEVER use fake law sections or made-up legal provisions
+2. NEVER give final legal judgments
+3. ALWAYS use simple, friendly language
+4. Only help with Indian law — politely decline anything else
+5. Keep bullet points concise — max 1-2 lines each
+6. The document offer section is OPTIONAL — only show if relevant
+7. In document mode, ask for ALL required details before generating
+8. Generated documents must use real Indian legal language
+
+════════════════════════════════════
+CONVERSATION HISTORY:
+${chatHistory || "No previous conversation"}
+
+USER'S QUESTION:
 ${question}
 `;
 
@@ -245,16 +307,18 @@ ${question}
 
     const answer =
       data?.choices?.[0]?.message?.content || "No response from AI";
-    await supabase.from("messages").insert([
-  {
-    user_id,
-    case_id: caseId,
-    role: "assistant",
-    content: answer,
-  },
-]);
+   
+     await supabase.from("messages").insert([
+      {
+        user_id,
+        case_id: currentCaseId,
+        role: "assistant",
+        content: answer,
+      },
+    ]);
 
-   res.json({ answer, caseId });
+    res.json({ answer, caseId: currentCaseId  });
+
   } catch (err) {
     console.error("Groq Error:", err);
     res.status(500).json({ error: "AI failed" });
