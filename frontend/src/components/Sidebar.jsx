@@ -1,6 +1,7 @@
 
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { LogOut, Scale, Plus, MessageSquare } from "lucide-react";
 import { supabase } from "../lib/supabase-clients";
 
@@ -80,8 +81,8 @@ const Sidebar = ({ children, onSelectCase , onNewChat }) => {
         {/* Logo */}
         <div className="px-6 py-5 border-b border-gray-200">
           <div className="flex items-center gap-2">
-            <Scale size={20} className="text-emerald-600" />
-            <span className="font-bold text-gray-900 text-lg">NyayaAI</span>
+            
+            <Link to="/"  className="font-bold text-gray-900 text-lg">NyayaAI</Link>
           </div>
         </div>
 
