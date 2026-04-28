@@ -7,6 +7,9 @@ import ReactMarkdown from "react-markdown";
 import { usePdfExport } from "../hooks/usePdfExport";
 import { Download } from "lucide-react";
 
+import { Mic, MicOff } from "lucide-react";
+import { useVoiceInput } from "../hooks/useVoiceInput";
+
 const Chat = ({ caseId }) => {
   const { exportToPdf } = usePdfExport();
   const location = useLocation();
@@ -14,6 +17,7 @@ const Chat = ({ caseId }) => {
   const [prompt, setPrompt] = useState(initialPrompt);
   const [user, setUser] = useState(null);
   const [currentCaseId, setCurrentCaseId] = useState(caseId);
+  const [lang, setLang] = useState("hi-IN");
 
   const [messages, setMessages] = useState([]);
 
@@ -60,6 +64,11 @@ const isDocumentMessage = (content) => {
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  const { isListening, error: voiceError, startListening, stopListening } = useVoiceInput({
+  onTranscript: (text) => setPrompt((prev) => prev + text),
+  language: lang,
+});
 
   const sendMessage = async () => {
     if (!prompt.trim()) return;
@@ -217,48 +226,91 @@ const token = sessionData.session.access_token;
 ))}
   <div ref={messagesEndRef} />
 </div>
-      <div className="mt-auto bg-white pt-4 pb-2 z-10">
-        <div className="w-full bg-white border border-gray-200 shadow-[0_8px_30px_rgb(0,0,0,0.06)] rounded-2xl overflow-hidden transition-all focus-within:ring-2 focus-within:ring-gray-900/10 focus-within:border-gray-300">
-          <textarea
-            value={prompt}
-            onChange={(e) => setPrompt(e.target.value)}
-            className="w-full p-4 resize-none outline-none bg-transparent text-gray-900 placeholder:text-gray-400 text-base max-h-40 overflow-y-auto"
-            placeholder="Describe your legal issue..."
-            rows="1"
-            onInput={(e) => {
-              e.target.style.height = "auto";
-              e.target.style.height = e.target.scrollHeight + "px";
-            }}
-          />
 
-          <div className="flex items-center justify-between pb-3 px-4 pt-1">
-            <button
-              className="flex items-center justify-center bg-gray-50 hover:bg-gray-100 border border-gray-100 transition-colors p-1.5 rounded-full size-8 text-gray-500 hover:text-gray-900"
-              aria-label="Add attachment"
-            >
-              <Plus size={18} strokeWidth={2.5} />
-            </button>
+       <div className="mt-auto bg-white pt-4 pb-2 z-10">
+  <div className="w-full bg-white border border-gray-200 shadow-[0_8px_30px_rgb(0,0,0,0.06)] rounded-2xl overflow-hidden transition-all focus-within:ring-2 focus-within:ring-gray-900/10 focus-within:border-gray-300">
+    <textarea
+      value={prompt}
+      onChange={(e) => setPrompt(e.target.value)}
+      className="w-full p-4 resize-none outline-none bg-transparent text-gray-900 placeholder:text-gray-400 text-base max-h-40 overflow-y-auto"
+      placeholder="Describe your legal issue..."
+      rows="1"
+      onInput={(e) => {
+        e.target.style.height = "auto";
+        e.target.style.height = e.target.scrollHeight + "px";
+      }}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" && !e.shiftKey) {
+          e.preventDefault();
+          sendMessage();
+        }
+      }}
+    />
 
-            <button
-              onClick={sendMessage}
-              disabled={prompt.trim().length === 0}
-              className={`flex items-center justify-center p-1.5 rounded-full size-8 transition-colors ${
-                prompt.trim().length > 0
-                  ? "bg-gray-900 text-white hover:bg-black shadow-md"
-                  : "bg-gray-100 text-gray-400 cursor-not-allowed"
-              }`}
-            >
-              <ArrowUp size={18} strokeWidth={2.5} />
-            </button>
-          </div>
-        </div>
+    <div className="flex items-center justify-between pb-3 px-4 pt-1">
+      <div className="flex items-center gap-2">
+        {/* Existing attachment button */}
+        <button
+          className="flex items-center justify-center bg-gray-50 hover:bg-gray-100 border border-gray-100 transition-colors p-1.5 rounded-full size-8 text-gray-500 hover:text-gray-900"
+          aria-label="Add attachment"
+        >
+          <Plus size={18} strokeWidth={2.5} />
+        </button>
 
-        <p className="text-[11px] text-gray-400 text-center mt-4">
-          NyayaAI can make mistakes. Always verify important legal information
-          with an advocate.
-        </p>
+        {/* 🎤 Mic button */}
+        <button
+          onClick={isListening ? stopListening : startListening}
+          title={isListening ? "Stop recording" : "Speak your question"}
+          className={`flex items-center justify-center p-1.5 rounded-full size-8 transition-colors border ${
+            isListening
+              ? "bg-red-500 border-red-400 text-white animate-pulse"
+              : "bg-gray-50 border-gray-100 text-gray-500 hover:bg-gray-100 hover:text-gray-900"
+          }`}
+          aria-label={isListening ? "Stop voice input" : "Start voice input"}
+        >
+          {isListening ? <MicOff size={18} strokeWidth={2.5} /> : <Mic size={18} strokeWidth={2.5} />}
+        </button>
+
+        {/* Language selector — only visible when mic is active */}
+        {isListening && (
+          <select
+            value={lang}
+            onChange={(e) => setLang(e.target.value)}
+            className="text-xs border border-gray-200 rounded-lg px-2 py-1 bg-white text-gray-600 outline-none"
+          >
+            <option value="hi-IN">हिंदी</option>
+            <option value="en-IN">English</option>
+            <option value="gu-IN">ગુજરાતી</option>
+          </select>
+        )}
       </div>
+
+      {/* Send button */}
+      <button
+        onClick={sendMessage}
+        disabled={prompt.trim().length === 0}
+        className={`flex items-center justify-center p-1.5 rounded-full size-8 transition-colors ${
+          prompt.trim().length > 0
+            ? "bg-gray-900 text-white hover:bg-black shadow-md"
+            : "bg-gray-100 text-gray-400 cursor-not-allowed"
+        }`}
+      >
+        <ArrowUp size={18} strokeWidth={2.5} />
+      </button>
     </div>
+
+    {/* Voice error message */}
+    {voiceError && (
+      <p className="text-xs text-red-500 px-4 pb-2">⚠️ {voiceError}</p>
+    )}
+  </div>
+
+  <p className="text-[11px] text-gray-400 text-center mt-4">
+    NyayaAI can make mistakes. Always verify important legal information
+    with an advocate.
+  </p>
+</div>
+      </div>
   );
 };
 
