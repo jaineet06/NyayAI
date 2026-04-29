@@ -2,6 +2,14 @@ import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 import { createClient } from "@supabase/supabase-js";
+//import pdfParse from "pdf-parse/lib/pdf-parse.js";
+
+import { createRequire } from "module";
+const require = createRequire(import.meta.url);
+//const pdfParse = require("pdf-parse").default ?? require("pdf-parse");
+// const { PDFParse } = require("pdf-parse");
+
+const pdfParse = require("pdf-parse");
 
 
 dotenv.config();
@@ -9,7 +17,7 @@ dotenv.config();
 const app = express();
 
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: "20mb" }));
 
 
 export const supabase = createClient(
@@ -65,11 +73,17 @@ app.post("/ask", async (req, res) => {
   try {
     const token = req.headers.authorization?.split(" ")[1];
 
-    let { question, history, caseId } = req.body;
+    let { question, history, caseId, documentBase64, documentType, documentName } = req.body;
 
     if (!token) {
       return res.status(401).json({ error: "No token provided" });
     }
+
+    // Allow document-only submissions
+if (!question && !documentBase64) {
+  return res.status(400).json({ error: "Question or document required" });
+}
+if (!question) question = "";
 
     
 
@@ -85,6 +99,34 @@ if (!user) {
 }
 
 const user_id = user.id;
+// ── Document extraction ──────────────────────────────
+let documentText = "";
+
+if (documentBase64) {
+  try {
+    const buffer = Buffer.from(documentBase64, "base64");
+if (documentType === "application/pdf") {
+  // const parser = new PDFParse();
+  // const parsed = await parser.pdf(buffer);
+
+  const parsed = await pdfParse(buffer);
+  documentText = parsed.text?.slice(0, 6000);
+}else if (documentType?.startsWith("image/")) {
+  const { createWorker } = await import("tesseract.js");
+  const worker = await createWorker("eng+hin"); // English + Hindi
+  const { data: { text } } = await worker.recognize(buffer);
+  await worker.terminate();
+  documentText = text?.slice(0, 6000) || "[Could not extract text from image]";
+} else {
+      // .doc/.docx — treat as plain text best-effort
+      documentText = buffer.toString("utf-8").replace(/[^\x20-\x7E\n]/g, " ").slice(0, 6000);
+    }
+  } catch (err) {
+    console.error("Document parse error:", err);
+    documentText = "[Could not read the document. Please paste the text manually.]";
+  }
+}
+// ─────────────────────────────────────────────────────
 
 const caseType = detectCaseType(question);
   
@@ -111,14 +153,16 @@ if (!currentCaseId) {
 
   currentCaseId = caseData.id;
 }
-    await supabase.from("messages").insert([
-      {
-        user_id,
-        case_id: currentCaseId,
-        role: "user",
-        content: question,
-      },
-    ]);
+   await supabase.from("messages").insert([
+  {
+    user_id,
+    case_id: currentCaseId,
+    role: "user",
+    content: documentName
+      ? `${question || "Analyze this document"}\n\n📎 Attached: ${documentName}`
+      : question,
+  },
+]);
    
 
     console.log("Detected Case Type:", caseType); 
@@ -273,8 +317,23 @@ STRICT RULES:
 CONVERSATION HISTORY:
 ${chatHistory || "No previous conversation"}
 
+${documentText ? `
+════════════════════════════════════
+UPLOADED DOCUMENT: ${documentName}
+════════════════════════════════════
+${documentText}
+════════════════════════════════════
+TASK: The user has uploaded a legal document above.
+- Identify what type of document it is (legal notice, rental agreement, FIR, etc.)
+- Summarize it in simple plain language (Hindi or English based on doc language)
+- Highlight key obligations, deadlines, or rights mentioned
+- Flag anything urgent the user must act on
+- Suggest next steps
+════════════════════════════════════
+` : ""}
+
 USER'S QUESTION:
-${question}
+${question || (documentText ? "Please analyze the uploaded document." : "")}
 `;
 
    const response = await fetch(

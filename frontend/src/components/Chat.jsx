@@ -9,6 +9,7 @@ import { Download } from "lucide-react";
 
 import { Mic, MicOff } from "lucide-react";
 import { useVoiceInput } from "../hooks/useVoiceInput";
+import { Paperclip, X, FileText, Image } from "lucide-react"; 
 
 const Chat = ({ caseId }) => {
   const { exportToPdf } = usePdfExport();
@@ -19,9 +20,52 @@ const Chat = ({ caseId }) => {
   const [currentCaseId, setCurrentCaseId] = useState(caseId);
   const [lang, setLang] = useState("hi-IN");
 
+
   const [messages, setMessages] = useState([]);
 
   const messagesEndRef = useRef(null);
+
+  const [attachedFile, setAttachedFile] = useState(null); // { name, type, base64, preview }
+const fileInputRef = useRef(null);
+
+const handleFileSelect = (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  const allowedTypes = [
+    "application/pdf",
+    "image/jpeg",
+    "image/png",
+    "image/webp",
+    "application/msword",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  ];
+
+  if (!allowedTypes.includes(file.type)) {
+    alert("Please upload a PDF, image (JPG/PNG), or Word document.");
+    return;
+  }
+
+  if (file.size > 10 * 1024 * 1024) {
+    alert("File must be under 10MB.");
+    return;
+  }
+
+  const reader = new FileReader();
+  reader.onload = () => {
+    const base64 = reader.result.split(",")[1]; // strip data:...;base64,
+    setAttachedFile({
+      name: file.name,
+      type: file.type,
+      base64,
+      preview: file.type.startsWith("image/") ? reader.result : null,
+    });
+  };
+  reader.readAsDataURL(file);
+
+  // reset so same file can be re-selected
+  e.target.value = "";
+};
 
   useEffect(() => {
     const getUser = async () => {
@@ -74,14 +118,21 @@ const isDocumentMessage = (content) => {
     if (!prompt.trim()) return;
     
     const userMessage = prompt;
-
+    
     const updatedMessages = [
-      ...messages,
-      { role: "user", content: userMessage },
-    ];
+  ...messages,
+  {
+    role: "user",
+    content: attachedFile
+      ? `${userMessage}\n\n📎 *Attached: ${attachedFile.name}*`
+      : userMessage,
+  },
+];
 
     setMessages(updatedMessages);
     setPrompt("");
+
+    setAttachedFile(null);
 
     try {
       
@@ -113,6 +164,13 @@ const token = sessionData.session.access_token;
           question: userMessage,
           history: updatedMessages,
           caseId: currentCaseId,
+
+            ...(attachedFile && {
+    documentBase64: attachedFile.base64,
+    documentType: attachedFile.type,
+    documentName: attachedFile.name,
+  }),
+
           
         }),
       });
@@ -227,13 +285,45 @@ const token = sessionData.session.access_token;
   <div ref={messagesEndRef} />
 </div>
 
-       <div className="mt-auto bg-white pt-4 pb-2 z-10">
+    <div className="mt-auto bg-white pt-4 pb-2 z-10">
+
+  {/* File preview chip */}
+  {attachedFile && (
+    <div className="flex items-center gap-2 mb-2 px-1">
+      <div className="flex items-center gap-2 bg-gray-100 border border-gray-200 rounded-xl px-3 py-2 text-sm text-gray-700 max-w-xs">
+        {attachedFile.preview ? (
+          <img
+            src={attachedFile.preview}
+            alt="preview"
+            className="w-8 h-8 rounded object-cover"
+          />
+        ) : (
+          <FileText size={16} className="text-emerald-600 shrink-0" />
+        )}
+        <span className="truncate text-xs font-medium">{attachedFile.name}</span>
+        <button
+          onClick={() => setAttachedFile(null)}
+          className="ml-1 text-gray-400 hover:text-gray-700 transition-colors shrink-0"
+        >
+          <X size={14} />
+        </button>
+      </div>
+      <span className="text-xs text-gray-400 italic">
+        I'll summarize this document for you
+      </span>
+    </div>
+  )}
+
   <div className="w-full bg-white border border-gray-200 shadow-[0_8px_30px_rgb(0,0,0,0.06)] rounded-2xl overflow-hidden transition-all focus-within:ring-2 focus-within:ring-gray-900/10 focus-within:border-gray-300">
     <textarea
       value={prompt}
       onChange={(e) => setPrompt(e.target.value)}
       className="w-full p-4 resize-none outline-none bg-transparent text-gray-900 placeholder:text-gray-400 text-base max-h-40 overflow-y-auto"
-      placeholder="Describe your legal issue..."
+      placeholder={
+        attachedFile
+          ? "Ask me to summarize, explain, or simplify this document..."
+          : "Describe your legal issue..."
+      }
       rows="1"
       onInput={(e) => {
         e.target.style.height = "auto";
@@ -249,15 +339,31 @@ const token = sessionData.session.access_token;
 
     <div className="flex items-center justify-between pb-3 px-4 pt-1">
       <div className="flex items-center gap-2">
-        {/* Existing attachment button */}
+
+        {/* Hidden file input */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx"
+          onChange={handleFileSelect}
+          className="hidden"
+        />
+
+        {/* + / Paperclip button → triggers file input */}
         <button
-          className="flex items-center justify-center bg-gray-50 hover:bg-gray-100 border border-gray-100 transition-colors p-1.5 rounded-full size-8 text-gray-500 hover:text-gray-900"
-          aria-label="Add attachment"
+          onClick={() => fileInputRef.current?.click()}
+          className={`flex items-center justify-center border transition-colors p-1.5 rounded-full size-8 ${
+            attachedFile
+              ? "bg-emerald-50 border-emerald-200 text-emerald-600"
+              : "bg-gray-50 border-gray-100 text-gray-500 hover:bg-gray-100 hover:text-gray-900"
+          }`}
+          aria-label="Attach document"
+          title="Upload PDF, image, or Word document"
         >
-          <Plus size={18} strokeWidth={2.5} />
+          <Paperclip size={18} strokeWidth={2.5} />
         </button>
 
-        {/* 🎤 Mic button */}
+        {/* 🎤 Mic button (from previous step) */}
         <button
           onClick={isListening ? stopListening : startListening}
           title={isListening ? "Stop recording" : "Speak your question"}
@@ -266,12 +372,11 @@ const token = sessionData.session.access_token;
               ? "bg-red-500 border-red-400 text-white animate-pulse"
               : "bg-gray-50 border-gray-100 text-gray-500 hover:bg-gray-100 hover:text-gray-900"
           }`}
-          aria-label={isListening ? "Stop voice input" : "Start voice input"}
         >
           {isListening ? <MicOff size={18} strokeWidth={2.5} /> : <Mic size={18} strokeWidth={2.5} />}
         </button>
 
-        {/* Language selector — only visible when mic is active */}
+        {/* Language selector */}
         {isListening && (
           <select
             value={lang}
@@ -288,9 +393,9 @@ const token = sessionData.session.access_token;
       {/* Send button */}
       <button
         onClick={sendMessage}
-        disabled={prompt.trim().length === 0}
+        disabled={prompt.trim().length === 0 && !attachedFile}
         className={`flex items-center justify-center p-1.5 rounded-full size-8 transition-colors ${
-          prompt.trim().length > 0
+          prompt.trim().length > 0 || attachedFile
             ? "bg-gray-900 text-white hover:bg-black shadow-md"
             : "bg-gray-100 text-gray-400 cursor-not-allowed"
         }`}
@@ -299,15 +404,13 @@ const token = sessionData.session.access_token;
       </button>
     </div>
 
-    {/* Voice error message */}
     {voiceError && (
       <p className="text-xs text-red-500 px-4 pb-2">⚠️ {voiceError}</p>
     )}
   </div>
 
   <p className="text-[11px] text-gray-400 text-center mt-4">
-    NyayaAI can make mistakes. Always verify important legal information
-    with an advocate.
+    NyayaAI can make mistakes. Always verify important legal information with an advocate.
   </p>
 </div>
       </div>
